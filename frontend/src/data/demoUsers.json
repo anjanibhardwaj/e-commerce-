@@ -1,0 +1,98 @@
+{
+  "users": [
+    {
+      "id": "user-001",
+      "name": "Rohan Sharma",
+      "email": "user@example.com",
+      "password": "user123",
+      "phone": "+91 9876543210",
+      "role": "user",
+      "isPlusMember": true,
+      "addresses": [
+        {
+          "id": "addr-1",
+          "tag": "Home",
+          "street": "Apt 402, Green Meadows, Andheri West",
+          "city": "Mumbai",
+          "state": "Maharashtra",
+          "pincode": "400058",
+          "isDefault": true
+        },
+        {
+          "id": "addr-2",
+          "tag": "Office",
+          "street": "Tech Park, Building 3, Bandra Kurla Complex",
+          "city": "Mumbai",
+          "state": "Maharashtra",
+          "pincode": "400051",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "id": "user-002",
+      "name": "Priya Patel",
+      "email": "priya@example.com",
+      "password": "user123",
+      "phone": "+91 9123456780",
+      "role": "user",
+      "isPlusMember": false,
+      "addresses": [
+        {
+          "id": "addr-3",
+          "tag": "Home",
+          "street": "Flat 12, Sunrise Residency, Viman Nagar",
+          "city": "Pune",
+          "state": "Maharashtra",
+          "pincode": "411014",
+          "isDefault": true
+        }
+      ]
+    }
+  ],
+  "sellers": [
+    {
+      "id": "seller-001",
+      "name": "Apollo Care Pharmacy",
+      "contactPerson": "Dr. Rajesh Gupta",
+      "email": "seller@example.com",
+      "password": "seller123",
+      "phone": "+91 9820012345",
+      "role": "seller",
+      "status": "approved",
+      "licenseNumber": "DL-MH-2024-88491",
+      "gstin": "27AAACA1234A1Z5",
+      "city": "Mumbai",
+      "address": "Shop 4, Lotus Enclave, Link Road, Mumbai 400053",
+      "rating": 4.8,
+      "joinedDate": "2025-08-15"
+    },
+    {
+      "id": "seller-002",
+      "name": "MediLife Wellness Store",
+      "contactPerson": "Sunita Verma",
+      "email": "seller2@example.com",
+      "password": "seller123",
+      "phone": "+91 9112233445",
+      "role": "seller",
+      "status": "pending",
+      "licenseNumber": "DL-DL-2026-11928",
+      "gstin": "07AABCM5678B1Z2",
+      "city": "Delhi",
+      "address": "Plot 18, Central Market, Connaught Place, New Delhi 110001",
+      "rating": 4.5,
+      "joinedDate": "2026-10-18"
+    }
+  ],
+  "admins": [
+    {
+      "id": "admin-001",
+      "name": "Platform Administrator",
+      "email": "admin@example.com",
+      "password": "admin123",
+      "phone": "+91 8888800000",
+      "role": "admin",
+      "department": "Platform Operations & Compliance"
+    }
+  ]
+}
