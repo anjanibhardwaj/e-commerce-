@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 /**
  * Connect to MongoDB database
@@ -15,7 +15,9 @@ export const connectDB = async () => {
       autoIndex: true,
     });
 
-    console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}`);
+    console.log(
+      `[MongoDB] Connected successfully to host: ${conn.connection.host}`,
+    );
     return conn;
   } catch (error) {
     console.error(`[MongoDB] Database connection error: ${error.message}`);
