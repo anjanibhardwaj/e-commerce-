@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
+import OrderTrackingModal from '../../components/OrderTrackingModal';
 import { 
   ClipboardList, 
   Search, 
@@ -16,6 +17,8 @@ export default function AdminOrdersPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedTrackingId, setSelectedTrackingId] = useState('');
 
   const filtered = orders.filter((o) => {
     if (searchTerm) {
@@ -138,10 +141,26 @@ export default function AdminOrdersPage() {
                       {order.courierPartner ? (
                         <div>
                           <span className="font-bold text-gray-900 block">{order.courierPartner}</span>
-                          <span className="font-mono text-[10px] text-gray-500">AWB: {order.trackingNumber}</span>
+                          <button
+                            onClick={() => {
+                              setSelectedTrackingId(order.orderNumber || order.id);
+                              setTrackingModalOpen(true);
+                            }}
+                            className="font-mono text-[10px] text-teal-700 hover:underline font-bold cursor-pointer"
+                          >
+                            AWB: {order.trackingNumber} ↗
+                          </button>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-[11px]">Unassigned (In Pharmacy)</span>
+                        <button
+                          onClick={() => {
+                            setSelectedTrackingId(order.orderNumber || order.id);
+                            setTrackingModalOpen(true);
+                          }}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 rounded-lg text-[10px] font-bold text-gray-600 transition cursor-pointer"
+                        >
+                          View Status ↗
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -155,6 +174,12 @@ export default function AdminOrdersPage() {
           </div>
         )}
       </div>
+
+      <OrderTrackingModal
+        isOpen={trackingModalOpen}
+        onClose={() => setTrackingModalOpen(false)}
+        initialOrderNumber={selectedTrackingId}
+      />
     </div>
   );
 }

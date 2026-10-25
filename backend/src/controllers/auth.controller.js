@@ -182,3 +182,56 @@ export const getMe = async (req, res, next) => {
     next(error);
   }
 };
+
+export const refreshAccessToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'TOKEN_REQUIRED', message: 'Refresh token is required.' }
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = await AuthService.verifyRefreshToken(refreshToken);
+    } catch {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_REFRESH_TOKEN', message: 'Refresh token is invalid or expired.' }
+      });
+    }
+
+    let account;
+    if (decoded.role === 'seller') {
+      account = await Seller.findById(decoded.sub);
+    } else {
+      account = await User.findById(decoded.sub);
+    }
+
+    if (!account) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'Account no longer exists.' }
+      });
+    }
+
+    const tokens = AuthService.generateTokens({
+      id: account._id,
+      role: account.role || (decoded.role === 'seller' ? 'seller' : 'customer'),
+      email: account.email,
+      name: account.name || account.businessName
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

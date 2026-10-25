@@ -188,3 +188,66 @@ export const cancelOrder = async (req, res, next) => {
     next(error);
   }
 };
+
+export const trackOrder = async (req, res, next) => {
+  try {
+    const { identifier } = req.params;
+
+    // Search by orderNumber, _id, or trackingNumber
+    let query = {
+      $or: [{ orderNumber: identifier }, { trackingNumber: identifier }]
+    };
+
+    if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
+      query.$or.push({ _id: identifier });
+    }
+
+    const order = await Order.findOne(query);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'ORDER_NOT_FOUND', message: `No order found matching identifier '${identifier}'.` }
+      });
+    }
+
+    let tracking = await DeliveryTracking.findOne({ orderId: order._id });
+
+    // Fallback events if tracking document was not created yet
+    const events = tracking?.events?.length
+      ? tracking.events
+      : [
+          {
+            status: order.status,
+            note: 'Order placed by patient and registered in system',
+            actor: order.userEmail,
+            at: order.createdAt
+          }
+        ];
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        customerName: order.userName,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        totalAmount: order.pricing.grandTotal / 100,
+        createdAt: order.createdAt,
+        courierPartner: order.courierPartner || 'BlueDart Pharma Express',
+        trackingNumber: order.trackingNumber || 'Pending Allocation',
+        shippingAddress: order.addressSnapshot,
+        items: order.items.map((it) => ({
+          name: it.name,
+          quantity: it.quantity,
+          price: it.unitPrice / 100,
+          batchNumber: it.batchNumber
+        })),
+        events
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

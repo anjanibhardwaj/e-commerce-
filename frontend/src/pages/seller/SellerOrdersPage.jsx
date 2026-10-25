@@ -16,7 +16,7 @@ import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 export default function SellerOrdersPage() {
   const { user } = useAuth();
-  const { orders, updateOrderStatus, showToast } = useData();
+  const { orders, acceptOrder, rejectOrder, packOrder, dispatchOrder, deliverOrder, showToast } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -26,6 +26,10 @@ export default function SellerOrdersPage() {
   const [courierPartner, setCourierPartner] = useState('BlueDart Pharma Express');
   const [trackingNumber, setTrackingNumber] = useState('');
 
+  // Reject modal state
+  const [rejectModalOrder, setRejectModalOrder] = useState(null);
+  const [rejectReason, setRejectReason] = useState('Stock unavailable at this pharmacy');
+
   // Seller's orders
   const sellerOrders = orders.filter(
     (o) => o.sellerId === user?.id || !o.sellerId
@@ -34,18 +38,29 @@ export default function SellerOrdersPage() {
   const filtered = sellerOrders.filter((o) => {
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
-      const match = o.id?.toLowerCase().includes(q) || o.userName?.toLowerCase().includes(q);
+      const match = (o.id || o._id || o.orderNumber)?.toLowerCase().includes(q) || o.userName?.toLowerCase().includes(q) || o.customerName?.toLowerCase().includes(q);
       if (!match) return false;
     }
-    if (statusFilter !== 'all' && o.status !== statusFilter) {
+    if (statusFilter !== 'all' && o.status?.toLowerCase() !== statusFilter.toLowerCase()) {
       return false;
     }
     return true;
   });
 
+  const handleAccept = (orderId) => {
+    acceptOrder(orderId);
+  };
+
+  const handleRejectConfirm = (e) => {
+    e.preventDefault();
+    if (!rejectModalOrder) return;
+    rejectOrder(rejectModalOrder.id || rejectModalOrder._id, rejectReason);
+    setRejectModalOrder(null);
+    setRejectReason('Stock unavailable at this pharmacy');
+  };
+
   const handleMarkPacked = (orderId) => {
-    updateOrderStatus(orderId, 'packed', { actor: user?.name || 'Seller' });
-    showToast(`Order #${orderId} marked as PACKED!`);
+    packOrder(orderId);
   };
 
   const handleConfirmDispatch = (e) => {
@@ -55,15 +70,13 @@ export default function SellerOrdersPage() {
       return;
     }
 
-    updateOrderStatus(dispatchModalOrder.id, 'dispatched', {
+    dispatchOrder(dispatchModalOrder.id || dispatchModalOrder._id, {
       trackingNumber,
-      courierPartner,
-      actor: user?.name || 'Seller'
+      courierPartner
     });
 
     setDispatchModalOrder(null);
     setTrackingNumber('');
-    showToast(`Order #${dispatchModalOrder.id} DISPATCHED with ${courierPartner}!`);
   };
 
   return (
@@ -191,16 +204,36 @@ export default function SellerOrdersPage() {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {(order.status === 'placed' || order.status === 'verified') && (
+                  {/* Accept or Reject for initial orders */}
+                  {(['placed', 'order_confirmed', 'payment_confirmed', 'prescription_approved'].includes(order.status?.toLowerCase())) && (
+                    <>
+                      <button
+                        onClick={() => handleAccept(order.id || order._id)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                      >
+                        Accept Order ✓
+                      </button>
+                      <button
+                        onClick={() => setRejectModalOrder(order)}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition cursor-pointer"
+                      >
+                        Reject ✕
+                      </button>
+                    </>
+                  )}
+
+                  {/* Processing / Dispensing state -> Pack */}
+                  {(['processing_pharmacy', 'verified'].includes(order.status?.toLowerCase())) && (
                     <button
-                      onClick={() => handleMarkPacked(order.id)}
-                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                      onClick={() => handleMarkPacked(order.id || order._id)}
+                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer shadow-xs"
                     >
-                      Mark as Packed
+                      Pack &amp; Seal Medicines
                     </button>
                   )}
 
-                  {order.status === 'packed' && (
+                  {/* Packed state -> Dispatch */}
+                  {order.status?.toLowerCase() === 'packed' && (
                     <button
                       onClick={() => {
                         setDispatchModalOrder(order);
@@ -212,13 +245,21 @@ export default function SellerOrdersPage() {
                     </button>
                   )}
 
-                  {order.status === 'dispatched' && (
+                  {/* Dispatched state -> Deliver */}
+                  {order.status?.toLowerCase() === 'dispatched' && (
                     <button
-                      onClick={() => updateOrderStatus(order.id, 'delivered', { actor: user?.name })}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                      onClick={() => deliverOrder(order.id || order._id)}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
                     >
                       Mark as Delivered ✓
                     </button>
+                  )}
+
+                  {/* Rejected badge */}
+                  {order.status?.toLowerCase() === 'rejected' && (
+                    <span className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-xl border border-rose-200">
+                      Rejected by Pharmacy
+                    </span>
                   )}
                 </div>
               </div>
@@ -282,6 +323,50 @@ export default function SellerOrdersPage() {
                   className="bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition"
                 >
                   Confirm Handover to Courier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Order Modal */}
+      {rejectModalOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-extrabold text-rose-700">
+              Reject Order #{rejectModalOrder.orderNumber || rejectModalOrder.id}
+            </h3>
+            <p className="text-xs text-gray-500">
+              Please state the reason for rejecting this order. Reserved stock will be automatically released back to inventory.
+            </p>
+
+            <form onSubmit={handleRejectConfirm} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Reason for Rejection</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="e.g. Stock damaged, prescription discrepancy, or out of delivery zone..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setRejectModalOrder(null)}
+                  className="text-xs text-gray-500 px-3 py-1.5 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition"
+                >
+                  Confirm Rejection
                 </button>
               </div>
             </form>

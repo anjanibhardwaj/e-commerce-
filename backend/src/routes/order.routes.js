@@ -1,9 +1,13 @@
 import express from 'express';
-import { createOrder, getMyOrders, getOrderById, cancelOrder } from '../controllers/order.controller.js';
+import { createOrder, getMyOrders, getOrderById, cancelOrder, trackOrder } from '../controllers/order.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Public track order endpoint (accessible by orderNumber or trackingNumber)
+router.get('/track/:identifier', trackOrder);
+
+// Authenticated customer endpoints
 router.use(requireAuth);
 
 router.post('/', createOrder);

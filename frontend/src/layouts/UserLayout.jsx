@@ -7,11 +7,12 @@ import LocationModal from '../components/LocationModal';
 import PrescriptionModal from '../components/PrescriptionModal';
 import OffersModal from '../components/OffersModal';
 import AskEasyChatModal from '../components/AskEasyChatModal';
+import OrderTrackingModal from '../components/OrderTrackingModal';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { mockCities } from '../data/mockData';
-import { LayoutDashboard, Store, ShieldCheck, ArrowRight } from 'lucide-react';
+import { LayoutDashboard, Store, ShieldCheck, ArrowRight, Truck } from 'lucide-react';
 
 export default function UserLayout() {
   const { user, role, logout } = useAuth();
@@ -25,6 +26,7 @@ export default function UserLayout() {
   const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
   const [isOffersOpen, setIsOffersOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState(mockCities[0]);
 
   const handleProceedToCheckout = () => {
@@ -47,6 +49,14 @@ export default function UserLayout() {
         </div>
 
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsTrackingOpen(true)}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-teal-800 hover:bg-teal-700 text-teal-200 hover:text-white font-medium transition text-[11px] cursor-pointer"
+          >
+            <Truck className="w-3.5 h-3.5 text-teal-300" />
+            <span>Track Order</span>
+          </button>
+
           <Link
             to="/seller/login"
             className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-teal-700 text-slate-200 hover:text-white font-medium transition text-[11px]"
@@ -151,6 +161,12 @@ export default function UserLayout() {
             navigate('/products');
           }
         }}
+      />
+
+      {/* Live Order Tracking Modal */}
+      <OrderTrackingModal
+        isOpen={isTrackingOpen}
+        onClose={() => setIsTrackingOpen(false)}
       />
 
       {/* Global Toast */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import OrderTrackingModal from '../../components/OrderTrackingModal';
 import { 
   Package, 
   Truck, 
@@ -21,6 +22,8 @@ export default function OrdersHistoryPage() {
   const { orders } = useData();
 
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedTrackingId, setSelectedTrackingId] = useState('');
 
   // Filter user's orders
   const userOrders = orders.filter(
@@ -100,7 +103,18 @@ export default function OrdersHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setSelectedTrackingId(order.orderNumber || order.id);
+                      setTrackingModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Live Track</span>
+                  </button>
+
                   <div className="text-right">
                     <span className="text-[10px] text-gray-400 block font-semibold">Total Paid</span>
                     <span className="text-sm font-black text-gray-900">{formatCurrency(order.totalAmount)}</span>
@@ -193,6 +207,12 @@ export default function OrdersHistoryPage() {
           );
         })}
       </div>
+
+      <OrderTrackingModal
+        isOpen={trackingModalOpen}
+        onClose={() => setTrackingModalOpen(false)}
+        initialOrderNumber={selectedTrackingId}
+      />
     </div>
   );
 }

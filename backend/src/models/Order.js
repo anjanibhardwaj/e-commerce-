@@ -47,6 +47,7 @@ const OrderSchema = new mongoose.Schema(
       enum: [
         'PAYMENT_PENDING',
         'PAYMENT_CONFIRMED',
+        'ORDER_CONFIRMED',
         'AWAITING_PRESCRIPTION_REVIEW',
         'PRESCRIPTION_APPROVED',
         'PROCESSING_PHARMACY',
@@ -55,6 +56,7 @@ const OrderSchema = new mongoose.Schema(
         'OUT_FOR_DELIVERY',
         'DELIVERED',
         'CANCELLED',
+        'REJECTED',
         'REFUNDED'
       ],
       default: 'PAYMENT_PENDING',

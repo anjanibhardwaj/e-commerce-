@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Seller from '../models/Seller.js';
 import Product from '../models/Product.js';
+import Inventory from '../models/Inventory.js';
 import Order from '../models/Order.js';
 import Prescription from '../models/Prescription.js';
 import AuditLog from '../models/AuditLog.js';
@@ -151,6 +152,82 @@ export const getAuditLogs = async (req, res, next) => {
   try {
     const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(100);
     return res.status(200).json({ success: true, data: logs });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAdminProducts = async (req, res, next) => {
+  try {
+    const products = await Product.find().sort({ createdAt: -1 });
+    const productIds = products.map((p) => p._id);
+    const inventories = await Inventory.find({ productId: { $in: productIds } });
+    const invMap = new Map(inventories.map((i) => [i.productId.toString(), i]));
+
+    const formatted = products.map((p) => {
+      const inv = invMap.get(p._id.toString());
+      return {
+        id: p._id,
+        name: p.name,
+        brand: p.brand,
+        category: p.categoryName,
+        mrp: p.mrp / 100,
+        price: p.sellingPrice / 100,
+        prescriptionRequired: p.prescriptionRequired,
+        approvalStatus: p.approvalStatus,
+        status: p.status,
+        sellerId: p.sellerId,
+        sellerName: p.sellerName || 'Apollo Care Pharmacy',
+        stock: inv ? inv.availableQty : 0,
+        batchNumber: inv ? inv.batchNumber : 'N/A',
+        expiryDate: inv ? inv.expiryDate : null,
+        image: p.images[0] || ''
+      };
+    });
+
+    return res.status(200).json({ success: true, data: formatted });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAdminPrescriptions = async (req, res, next) => {
+  try {
+    const prescriptions = await Prescription.find().sort({ createdAt: -1 });
+    const userIds = prescriptions.map((p) => p.userId);
+    const users = await User.find({ _id: { $in: userIds } });
+    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+
+    const formatted = prescriptions.map((rx) => {
+      const u = userMap.get(rx.userId?.toString());
+      return {
+        id: rx._id,
+        patientName: rx.patientName,
+        patientAge: rx.patientAge,
+        doctorName: rx.doctorName,
+        hospitalClinic: rx.hospitalClinic,
+        status: rx.status,
+        userEmail: u?.email || 'N/A',
+        userName: u?.name || rx.patientName,
+        uploadedAt: rx.createdAt,
+        validUntil: rx.validUntil,
+        fileKey: rx.fileKey,
+        reviewNotes: rx.reviewNotes
+      };
+    });
+
+    return res.status(200).json({ success: true, data: formatted });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await Product.findByIdAndDelete(id);
+    await Inventory.deleteMany({ productId: id });
+    return res.status(200).json({ success: true, message: 'Product deleted from database.' });
   } catch (error) {
     next(error);
   }
