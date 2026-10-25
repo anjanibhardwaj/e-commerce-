@@ -1,17 +1,40 @@
-import 'dotenv/config'
-import express from 'express'
-import cors from 'cors'
+import 'dotenv/config';
+import http from 'http';
+import app from './src/app.js';
+import { connectDB } from './src/config/db.js';
+import { config } from './src/config/env.js';
 
-const app = express()
-const PORT = process.env.PORT || 5000
+const startServer = async () => {
+  try {
+    // 1. Connect to MongoDB
+    await connectDB();
 
-app.use(cors())
-app.use(express.json())
+    // 2. Start HTTP server
+    const server = http.createServer(app);
+    server.listen(config.port, () => {
+      console.log(`====================================================`);
+      console.log(`  Medical E-Commerce Backend Server                 `);
+      console.log(`  Port:    ${config.port}                           `);
+      console.log(`  Mode:    ${config.nodeEnv}                        `);
+      console.log(`  URL:     http://localhost:${config.port}          `);
+      console.log(`  API:     http://localhost:${config.port}/api/v1   `);
+      console.log(`====================================================`);
+    });
 
-app.get('/', (req, res) => {
-  res.json({ message: 'E-commerce backend is running' })
-})
+    const shutdown = async (signal) => {
+      console.log(`\nReceived ${signal}. Gracefully shutting down...`);
+      server.close(() => {
+        console.log('HTTP server closed.');
+        process.exit(0);
+      });
+    };
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
-})
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+  } catch (error) {
+    console.error('Fatal initialization error:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

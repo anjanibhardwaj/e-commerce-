@@ -1,26 +1,19 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
+import { config } from './env.js';
 
-/**
- * Connect to MongoDB database
- * Future backend integration module
- */
 export const connectDB = async () => {
   try {
-    const connUri = process.env.MONGODB_URI;
-    if (!connUri) {
-      throw new Error("MONGODB_URI environment variable is missing.");
-    }
-
-    const conn = await mongoose.connect(connUri, {
-      autoIndex: true,
+    const conn = await mongoose.connect(config.mongoUri, {
+      autoIndex: true
     });
 
-    console.log(
-      `[MongoDB] Connected successfully to host: ${conn.connection.host}`,
-    );
+    console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host} / database: ${conn.connection.name}`);
     return conn;
   } catch (error) {
     console.error(`[MongoDB] Database connection error: ${error.message}`);
-    process.exit(1);
+    // In production we exit; in dev we log and let nodemon or retry handle it
+    if (config.nodeEnv === 'production') {
+      process.exit(1);
+    }
   }
 };

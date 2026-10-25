@@ -1,13 +1,14 @@
 import demoData from '../data/demoUsers.json';
+import { apiClient } from './apiClient';
 
 const SESSION_STORAGE_KEY = 'med_ecommerce_session';
 const REGISTERED_USERS_KEY = 'med_ecommerce_registered_users';
 const REGISTERED_SELLERS_KEY = 'med_ecommerce_registered_sellers';
 
 /**
- * Authentication Service Abstraction
- * Currently validates against demoUsers.json & localStorage.
- * Can be swapped with Node.js/MongoDB API calls in production without changing UI code.
+ * Authentication Service
+ * Seamlessly integrates live Node.js + MongoDB backend API
+ * with graceful demo fallback for offline or quick demonstration.
  */
 export const authService = {
   /**
@@ -17,12 +18,42 @@ export const authService = {
    * @param {'user'|'seller'|'admin'} expectedRole
    */
   async login(email, password, expectedRole) {
-    // Simulate slight async network delay
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
 
+    // Map frontend 'user' to backend 'customer'
+    const backendRole = expectedRole === 'user' ? 'customer' : expectedRole;
+
+    try {
+      // 1. Attempt Live Backend API login
+      const response = await apiClient.post('/auth/login', {
+        email: cleanEmail,
+        password: cleanPassword,
+        role: backendRole
+      });
+
+      if (response && response.success && response.data) {
+        const { user, accessToken, refreshToken } = response.data;
+        apiClient.setTokens(accessToken, refreshToken);
+
+        // Normalize role for frontend expectations
+        const normalizedUser = {
+          ...user,
+          role: user.role === 'customer' ? 'user' : user.role
+        };
+
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedUser));
+        return normalizedUser;
+      }
+    } catch (apiErr) {
+      console.warn('[authService] Live API login attempt failed or server offline, checking fallback:', apiErr.message);
+      // If error was explicitly INVALID_CREDENTIALS or ACCOUNT_SUSPENDED from the server, do not fallback to mock
+      if (apiErr.code === 'INVALID_CREDENTIALS' || apiErr.code === 'ACCOUNT_SUSPENDED' || apiErr.code === 'ACCOUNT_BLOCKED') {
+        throw apiErr;
+      }
+    }
+
+    // 2. Demo Local Fallback (ensures uninterrupted testing)
     const registeredUsers = JSON.parse(localStorage.getItem(REGISTERED_USERS_KEY) || '[]');
     const registeredSellers = JSON.parse(localStorage.getItem(REGISTERED_SELLERS_KEY) || '[]');
 
@@ -43,7 +74,7 @@ export const authService = {
 
     if (!matched) {
       throw new Error(
-        `Invalid ${expectedRole.toUpperCase()} credentials. Please check your email and password or use the demo quick-fill.`
+        `Invalid ${expectedRole.toUpperCase()} credentials. Please check your email and password.`
       );
     }
 
@@ -51,7 +82,6 @@ export const authService = {
       throw new Error('Your seller account has been suspended by administration. Please contact support.');
     }
 
-    // Save session in localStorage (excluding plain-text password)
     const { password: _, ...safeSession } = matched;
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safeSession));
     return safeSession;
@@ -61,9 +91,47 @@ export const authService = {
    * Register a new customer
    */
   async registerUser(userData) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
     const cleanEmail = userData.email.trim().toLowerCase();
+
+    try {
+      const response = await apiClient.post('/auth/register', {
+        name: userData.name,
+        email: cleanEmail,
+        password: userData.password,
+        phone: userData.phone
+      });
+
+      if (response && response.success && response.data) {
+        const { user, accessToken, refreshToken } = response.data;
+        apiClient.setTokens(accessToken, refreshToken);
+
+        const normalizedUser = {
+          ...user,
+          role: 'user',
+          addresses: userData.address ? [
+            {
+              id: `addr-${Date.now()}`,
+              tag: 'Home',
+              street: userData.address,
+              city: 'Mumbai',
+              state: 'Maharashtra',
+              pincode: '400001',
+              isDefault: true
+            }
+          ] : []
+        };
+
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedUser));
+        return normalizedUser;
+      }
+    } catch (apiErr) {
+      console.warn('[authService] Live API registration failed, checking fallback:', apiErr.message);
+      if (apiErr.code === 'USER_EXISTS') {
+        throw apiErr;
+      }
+    }
+
+    // Fallback registration
     const registeredUsers = JSON.parse(localStorage.getItem(REGISTERED_USERS_KEY) || '[]');
     const allUsers = [...demoData.users, ...registeredUsers];
 
@@ -75,7 +143,6 @@ export const authService = {
       id: `user-${Date.now()}`,
       name: userData.name,
       email: cleanEmail,
-      password: userData.password,
       phone: userData.phone || '+91 9999999999',
       role: 'user',
       isPlusMember: false,
@@ -104,8 +171,6 @@ export const authService = {
    * Register a new pharmacy seller
    */
   async registerSeller(sellerData) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
     const cleanEmail = sellerData.email.trim().toLowerCase();
     const registeredSellers = JSON.parse(localStorage.getItem(REGISTERED_SELLERS_KEY) || '[]');
     const allSellers = [...demoData.sellers, ...registeredSellers];
@@ -119,10 +184,9 @@ export const authService = {
       name: sellerData.businessName,
       contactPerson: sellerData.contactPerson,
       email: cleanEmail,
-      password: sellerData.password,
       phone: sellerData.phone,
       role: 'seller',
-      status: 'pending', // Pending Admin verification
+      status: 'pending',
       licenseNumber: sellerData.licenseNumber || `DL-${Math.floor(10000 + Math.random() * 90000)}`,
       gstin: sellerData.gstin || '27AAACB9999Z1',
       city: sellerData.city || 'Mumbai',
@@ -155,6 +219,7 @@ export const authService = {
    * Terminate active session
    */
   logout() {
+    apiClient.clearTokens();
     localStorage.removeItem(SESSION_STORAGE_KEY);
     return true;
   }
