@@ -5,6 +5,21 @@ const SESSION_STORAGE_KEY = 'med_ecommerce_session';
 const REGISTERED_USERS_KEY = 'med_ecommerce_registered_users';
 const REGISTERED_SELLERS_KEY = 'med_ecommerce_registered_sellers';
 
+export const ROLE_SESSION_KEYS = {
+  user: 'med_session_user',
+  seller: 'med_session_seller',
+  admin: 'med_session_admin',
+  superadmin: 'med_session_superadmin',
+};
+
+export const getRoleScopeFromPath = (path = '') => {
+  const p = (path || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase();
+  if (p.startsWith('/superadmin')) return 'superadmin';
+  if (p.startsWith('/admin')) return 'admin';
+  if (p.startsWith('/seller')) return 'seller';
+  return 'user';
+};
+
 /**
  * Authentication Service
  * Seamlessly integrates live Node.js + MongoDB backend API
@@ -34,7 +49,7 @@ export const authService = {
 
       if (response && response.success && response.data) {
         const { user, accessToken, refreshToken } = response.data;
-        apiClient.setTokens(accessToken, refreshToken);
+        apiClient.setTokens(accessToken, refreshToken, expectedRole);
 
         // Normalize role for frontend expectations
         const normalizedUser = {
@@ -42,6 +57,8 @@ export const authService = {
           role: user.role === 'customer' ? 'user' : user.role
         };
 
+        const roleKey = ROLE_SESSION_KEYS[expectedRole] || ROLE_SESSION_KEYS.user;
+        localStorage.setItem(roleKey, JSON.stringify(normalizedUser));
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedUser));
         return normalizedUser;
       }
@@ -62,7 +79,7 @@ export const authService = {
       pool = [...demoData.users, ...registeredUsers];
     } else if (expectedRole === 'seller') {
       pool = [...demoData.sellers, ...registeredSellers];
-    } else if (expectedRole === 'admin') {
+    } else if (expectedRole === 'admin' || expectedRole === 'superadmin') {
       pool = demoData.admins;
     } else {
       throw new Error(`Unsupported role: ${expectedRole}`);
@@ -83,6 +100,8 @@ export const authService = {
     }
 
     const { password: _, ...safeSession } = matched;
+    const roleKey = ROLE_SESSION_KEYS[expectedRole] || ROLE_SESSION_KEYS.user;
+    localStorage.setItem(roleKey, JSON.stringify(safeSession));
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safeSession));
     return safeSession;
   },
@@ -121,6 +140,8 @@ export const authService = {
           ] : []
         };
 
+        const roleKey = ROLE_SESSION_KEYS.user;
+        localStorage.setItem(roleKey, JSON.stringify(normalizedUser));
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedUser));
         return normalizedUser;
       }
@@ -163,6 +184,7 @@ export const authService = {
     localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(registeredUsers));
 
     const { password: _, ...safeSession } = newUser;
+    localStorage.setItem(ROLE_SESSION_KEYS.user, JSON.stringify(safeSession));
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safeSession));
     return safeSession;
   },
@@ -199,28 +221,59 @@ export const authService = {
     localStorage.setItem(REGISTERED_SELLERS_KEY, JSON.stringify(registeredSellers));
 
     const { password: _, ...safeSession } = newSeller;
+    localStorage.setItem(ROLE_SESSION_KEYS.seller, JSON.stringify(safeSession));
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safeSession));
     return safeSession;
   },
 
   /**
-   * Read current session from localStorage
+   * Read current session from localStorage (role-scoped)
    */
-  getCurrentUser() {
+  getCurrentUser(optionalRole) {
     try {
+      const role = optionalRole || getRoleScopeFromPath();
+      const roleKey = ROLE_SESSION_KEYS[role] || ROLE_SESSION_KEYS.user;
+      const scopedRaw = localStorage.getItem(roleKey);
+      if (scopedRaw) {
+        return JSON.parse(scopedRaw);
+      }
+
+      // Backward-compatible fallback
       const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const parsedRole = parsed.role === 'customer' ? 'user' : parsed.role;
+        if (role === 'user' && parsedRole === 'user') return parsed;
+        if (role === 'seller' && parsedRole === 'seller') return parsed;
+        if (role === 'admin' && (parsedRole === 'admin' || parsedRole === 'superadmin')) return parsed;
+        if (role === 'superadmin' && parsedRole === 'superadmin') return parsed;
+      }
+      return null;
     } catch {
       return null;
     }
   },
 
   /**
-   * Terminate active session
+   * Terminate active session for current role
    */
-  logout() {
-    apiClient.clearTokens();
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+  logout(targetRole) {
+    const role = targetRole || getRoleScopeFromPath();
+    const roleKey = ROLE_SESSION_KEYS[role];
+    if (roleKey) localStorage.removeItem(roleKey);
+    apiClient.clearTokens(role);
+
+    try {
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const parsedRole = parsed.role === 'customer' ? 'user' : parsed.role;
+        if (parsedRole === role) {
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+      }
+    } catch (_) {}
+
     return true;
   }
 };

@@ -12,8 +12,11 @@ import {
   Sparkles, 
   FileText, 
   PhoneCall,
-  X
+  X,
+  Activity,
+  Truck
 } from 'lucide-react';
+import { useData } from '../context/DataContext';
 
 export default function Header({ 
   cartCount, 
@@ -21,6 +24,7 @@ export default function Header({
   onOpenLocation, 
   selectedCity, 
   onOpenLogin, 
+  onOpenTrackOrder,
   user, 
   onOpenPrescription,
   onOpenOffers,
@@ -36,20 +40,20 @@ export default function Header({
   const searchRef = useRef(null);
   const navRef = useRef(null);
 
-  // Suggested keywords and quick results
-  const sampleSuggestions = [
-    { name: "Dolo 650 Strip of 15 Tablets", category: "Fever & Pain Relief", price: "₹30" },
-    { name: "Shelcal 500mg Strip Of 15 Tablets", category: "Vitamins & Supplements", price: "₹154" },
-    { name: "Evion 400mg Capsule 10s", category: "Skin & Hair Vitality", price: "₹95" },
-    { name: "Liveasy Wellness Calcium Magnesium", category: "Bone Health", price: "₹283" },
-    { name: "Comprehensive Full Body Checkup", category: "Thyrocare Lab Test", price: "₹2199" },
-    { name: "Himalaya Liv.52 Ds 60 Tablets", category: "Ayurvedic Care", price: "₹251" }
-  ];
+  const { products, lastRefreshedAt } = useData();
 
-  const filteredSuggestions = sampleSuggestions.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Search live products from MongoDB Atlas
+  const filteredSuggestions = (products || [])
+    .filter((item) => {
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        item.name?.toLowerCase().includes(q) ||
+        item.brand?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 8);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -142,9 +146,18 @@ export default function Header({
             </button>
           </div>
 
-          {/* Right Action Icons (Log in, Offers, Cart) */}
-          <div className="flex items-center space-x-4 sm:space-x-6">
+          {/* Right Action Icons (Live Sync, Log in, Offers, Cart) */}
+          <div className="flex items-center space-x-3 sm:space-x-5">
             
+            {/* Real-time DB 3s refresh indicator */}
+            <div 
+              title="Real-time live sync connected to MongoDB Atlas (updates every 3s)"
+              className="hidden lg:inline-flex items-center space-x-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-[11px] font-bold shadow-2xs"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Live DB (3s)</span>
+            </div>
+
             {/* User Login */}
             <button 
               onClick={onOpenLogin}
@@ -161,6 +174,15 @@ export default function Header({
                   {user ? user.name : "My Account"}
                 </span>
               </div>
+            </button>
+
+            {/* Track Order */}
+            <button 
+              onClick={onOpenTrackOrder}
+              className="flex items-center text-xs font-semibold text-gray-700 hover:text-teal-700 transition px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer"
+            >
+              <Truck className="w-4 h-4 mr-1.5 text-gray-600" />
+              <span className="hidden sm:inline">Track Order</span>
             </button>
 
             {/* Offers */}

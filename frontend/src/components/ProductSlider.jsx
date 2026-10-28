@@ -21,7 +21,7 @@ export default function ProductSlider({
   };
 
   const isItemInCart = (productId) => {
-    return cartItems.some(item => item.id === productId);
+    return cartItems.some((item) => (item.id || item._id) === productId);
   };
 
   return (
@@ -64,10 +64,11 @@ export default function ProductSlider({
           className="flex space-x-4 overflow-x-auto no-scrollbar py-2 px-1"
         >
           {products.map((product) => {
-            const inCart = isItemInCart(product.id);
+            const prodId = product.id || product._id;
+            const inCart = isItemInCart(prodId);
             return (
               <div 
-                key={product.id}
+                key={prodId}
                 className="shrink-0 w-48 sm:w-56 bg-white rounded-2xl border border-gray-200 p-3.5 flex flex-col justify-between hover:shadow-xl transition-all duration-200 hover:border-teal-400 group/card relative"
               >
                 {/* Discount Tag */}

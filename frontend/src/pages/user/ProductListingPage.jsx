@@ -38,9 +38,9 @@ export default function ProductListingPage() {
     if (brandParam) setSelectedBrand(brandParam);
   }, [categoryParam, brandParam]);
 
-  // Approved products only
+  // Approved products only from MongoDB Atlas
   const approvedProducts = useMemo(() => {
-    return products.filter((p) => p.approvalStatus === 'approved');
+    return products.filter((p) => !p.approvalStatus || p.approvalStatus === 'approved');
   }, [products]);
 
   // Extract unique categories and brands
@@ -295,10 +295,11 @@ export default function ProductListingPage() {
           {filteredProducts.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProducts.map((product) => {
-                const inCart = cart.find((item) => item.id === product.id);
+                const prodId = product.id || product._id;
+                const inCart = cart.find((item) => (item.id || item._id) === prodId);
                 return (
                   <div
-                    key={product.id}
+                    key={prodId}
                     className="bg-white rounded-2xl border border-gray-200 p-3.5 flex flex-col justify-between hover:shadow-xl transition-all duration-200 hover:border-teal-400 group"
                   >
                     <div>
@@ -346,7 +347,7 @@ export default function ProductListingPage() {
                         </div>
 
                         <Link
-                          to={`/products/${product.id}`}
+                          to={`/products/${prodId}`}
                           className="text-xs font-semibold text-gray-800 line-clamp-2 hover:text-teal-700 transition"
                         >
                           {product.name}
@@ -370,7 +371,7 @@ export default function ProductListingPage() {
                       {inCart ? (
                         <div className="flex items-center space-x-1.5 bg-teal-50 border border-teal-200 rounded-lg p-1">
                           <button
-                            onClick={() => updateQuantity(product.id, inCart.quantity - 1)}
+                            onClick={() => updateQuantity(prodId, inCart.quantity - 1)}
                             className="w-6 h-6 rounded bg-white text-teal-800 font-bold text-xs flex items-center justify-center hover:bg-teal-100 shadow-2xs"
                           >
                             -
@@ -379,7 +380,7 @@ export default function ProductListingPage() {
                             {inCart.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(product.id, inCart.quantity + 1)}
+                            onClick={() => updateQuantity(prodId, inCart.quantity + 1)}
                             className="w-6 h-6 rounded bg-teal-700 text-white font-bold text-xs flex items-center justify-center hover:bg-teal-800 shadow-2xs"
                           >
                             +

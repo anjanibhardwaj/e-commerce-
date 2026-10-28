@@ -7,18 +7,43 @@ class ApiClient {
     this.baseUrl = API_BASE_URL;
   }
 
+  getRoleScope() {
+    const path = (typeof window !== 'undefined' && window.location.pathname) || '';
+    if (path.startsWith('/superadmin')) return 'superadmin';
+    if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/seller')) return 'seller';
+    return 'user';
+  }
+
   getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    const role = this.getRoleScope();
+    return localStorage.getItem(`med_token_${role}`) || localStorage.getItem(TOKEN_KEY);
   }
 
-  setTokens(accessToken, refreshToken) {
-    if (accessToken) localStorage.setItem(TOKEN_KEY, accessToken);
-    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  setTokens(accessToken, refreshToken, role = null) {
+    const targetRole = role || this.getRoleScope();
+    if (accessToken) {
+      localStorage.setItem(`med_token_${targetRole}`, accessToken);
+      localStorage.setItem(TOKEN_KEY, accessToken);
+    }
+    if (refreshToken) {
+      localStorage.setItem(`med_refresh_token_${targetRole}`, refreshToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    }
   }
 
-  clearTokens() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearTokens(role = null) {
+    if (role) {
+      localStorage.removeItem(`med_token_${role}`);
+      localStorage.removeItem(`med_refresh_token_${role}`);
+    } else {
+      ['user', 'seller', 'admin', 'superadmin'].forEach((r) => {
+        localStorage.removeItem(`med_token_${r}`);
+        localStorage.removeItem(`med_refresh_token_${r}`);
+      });
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
   }
 
   getHeaders(isFormData = false) {

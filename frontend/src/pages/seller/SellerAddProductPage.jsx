@@ -30,12 +30,12 @@ export default function SellerAddProductPage() {
   const [prescriptionRequired, setPrescriptionRequired] = useState(false);
   const [dosage, setDosage] = useState('Take 1 tablet after meals or as directed by doctor');
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState('https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=60');
+  const [image, setImage] = useState('https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=500&auto=format&fit=crop&q=80');
   const [error, setError] = useState('');
 
   // Sample medical image presets for quick testing
   const sampleImages = [
-    { label: 'Tablets / Capsules', url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=60' },
+    { label: 'Tablets / Capsules', url: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=500&auto=format&fit=crop&q=80' },
     { label: 'Syrup / Tonic', url: 'https://images.unsplash.com/photo-1550572017-edd951aa8f72?w=500&auto=format&fit=crop&q=60' },
     { label: 'Healthcare Device', url: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=500&auto=format&fit=crop&q=60' },
     { label: 'Ointment / Gel', url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=500&auto=format&fit=crop&q=60' }

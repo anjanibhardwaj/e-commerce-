@@ -16,7 +16,7 @@ export default function AdminCategoriesPage() {
       id: `cat-${Date.now()}`,
       name: newCatName.trim(),
       discount: newCatDiscount,
-      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=60'
+      image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=300&auto=format&fit=crop&q=60'
     };
 
     setCategories([...categories, newCat]);

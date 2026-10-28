@@ -1,20 +1,62 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../services/authService';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { authService, getRoleScopeFromPath } from '../services/authService';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
 
+  const getScope = useCallback(() => {
+    return getRoleScopeFromPath(location.pathname);
+  }, [location.pathname]);
+
+  const [user, setUser] = useState(() => authService.getCurrentUser(getRoleScopeFromPath(typeof window !== 'undefined' ? window.location.pathname : '')));
+  const [loading, setLoading] = useState(false);
+
+  // Flipkart-style global Auth Modal state
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [pendingCallback, setPendingCallback] = useState(null);
+
+  // Sync active user when route changes or panel switches
   useEffect(() => {
-    // Restore session on page refresh
-    const session = authService.getCurrentUser();
-    if (session) {
-      setUser(session);
+    const scope = getScope();
+    const session = authService.getCurrentUser(scope);
+    setUser(session);
+  }, [location.pathname, getScope]);
+
+  // Listen to storage events for seamless multi-tab reactivity
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key && (e.key.startsWith('med_session_') || e.key === 'med_ecommerce_session')) {
+        const scope = getScope();
+        const session = authService.getCurrentUser(scope);
+        setUser(session);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [getScope]);
+
+  const openAuthModal = (callback = null) => {
+    setPendingCallback(() => callback);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+    setPendingCallback(null);
+  };
+
+  const handleAuthSuccess = (authenticatedUser) => {
+    setUser(authenticatedUser);
+    setIsAuthModalOpen(false);
+    if (typeof pendingCallback === 'function') {
+      const cb = pendingCallback;
+      setPendingCallback(null);
+      cb(authenticatedUser);
     }
-    setLoading(false);
-  }, []);
+  };
 
   const login = async (email, password, expectedRole) => {
     const loggedInUser = await authService.login(email, password, expectedRole);
@@ -34,8 +76,9 @@ export function AuthProvider({ children }) {
     return newSeller;
   };
 
-  const logout = () => {
-    authService.logout();
+  const logout = (roleOverride) => {
+    const scope = roleOverride || getScope();
+    authService.logout(scope);
     setUser(null);
   };
 
@@ -47,7 +90,11 @@ export function AuthProvider({ children }) {
     login,
     registerUser,
     registerSeller,
-    logout
+    logout,
+    isAuthModalOpen,
+    openAuthModal,
+    closeAuthModal,
+    handleAuthSuccess
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -8,11 +8,13 @@ import orderRoutes from './order.routes.js';
 import paymentRoutes from './payment.routes.js';
 import sellerRoutes from './seller.routes.js';
 import adminRoutes from './admin.routes.js';
+import couponRoutes from './coupon.routes.js';
 
 const router = express.Router();
 
 router.use('/auth', authRoutes);
 router.use('/products', productRoutes);
+router.use('/coupons', couponRoutes);
 router.use('/cart', cartRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/prescriptions', prescriptionRoutes);

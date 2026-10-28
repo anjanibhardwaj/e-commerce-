@@ -17,7 +17,6 @@ import {
   LogOut,
   Menu,
   X,
-  ExternalLink,
   Activity,
   AlertTriangle
 } from 'lucide-react';
@@ -69,27 +68,6 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      {/* Top Multi-Panel Navigation Banner */}
-      <div className="bg-slate-950 text-slate-300 text-xs px-4 py-2 flex flex-wrap items-center justify-between border-b border-slate-800">
-        <div className="flex items-center space-x-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-          <span className="font-bold text-white tracking-wide">ADMIN COMMAND CENTER:</span>
-          <span className="text-slate-400">Platform Operations &amp; Clinical Compliance</span>
-        </div>
-
-        <div className="flex items-center space-x-3 text-[11px]">
-          <Link to="/" className="flex items-center space-x-1 hover:text-white text-teal-400 transition">
-            <span>Customer Storefront</span>
-            <ExternalLink className="w-3 h-3" />
-          </Link>
-          <span className="text-slate-700">|</span>
-          <Link to="/seller/login" className="flex items-center space-x-1 hover:text-white text-emerald-400 transition">
-            <span>Seller Hub</span>
-            <ExternalLink className="w-3 h-3" />
-          </Link>
-        </div>
-      </div>
-
       <div className="flex flex-1 overflow-hidden relative">
         {/* Mobile Backdrop */}
         {isSidebarOpen && (

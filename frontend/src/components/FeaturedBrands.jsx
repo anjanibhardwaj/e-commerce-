@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { ChevronRight, ChevronLeft, Award } from 'lucide-react';
-import { mockBrands } from '../data/mockData';
+import { useData } from '../context/DataContext';
 
 export default function FeaturedBrands({ onSelectBrand }) {
+  const { products } = useData();
   const scrollRef = useRef(null);
 
   const scroll = (direction) => {
@@ -11,6 +12,32 @@ export default function FeaturedBrands({ onSelectBrand }) {
       scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
+
+  // Derive brands dynamically from live database products
+  const brands = useMemo(() => {
+    const brandSet = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
+    if (brandSet.length === 0) {
+      return [
+        { name: 'GSK', tagline: 'Global Healthcare Leader', color: 'text-teal-900' },
+        { name: 'Cipla', tagline: 'Caring For Life', color: 'text-blue-900' },
+        { name: 'Sun Pharma', tagline: 'Reaching People, Touching Lives', color: 'text-orange-900' },
+        { name: 'Abbott', tagline: 'Life. To The Fullest.', color: 'text-sky-900' },
+        { name: 'Torrent Pharma', tagline: 'Certified Pharmaceutical', color: 'text-indigo-900' },
+        { name: 'Micro Labs', tagline: 'Makers of Dolo 650', color: 'text-emerald-900' },
+        { name: 'Dabur', tagline: 'Pure Ayurvedic Care', color: 'text-amber-900' },
+        { name: 'Himalaya Wellness', tagline: 'Natural Herbal Formulas', color: 'text-emerald-900' }
+      ];
+    }
+    const colorClasses = [
+      'text-teal-900', 'text-blue-900', 'text-emerald-900', 'text-indigo-900', 
+      'text-cyan-900', 'text-amber-900', 'text-sky-900'
+    ];
+    return brandSet.map((name, index) => ({
+      name,
+      tagline: 'Verified Clinical Partner',
+      color: colorClasses[index % colorClasses.length]
+    }));
+  }, [products]);
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -37,7 +64,7 @@ export default function FeaturedBrands({ onSelectBrand }) {
           ref={scrollRef}
           className="flex space-x-4 overflow-x-auto no-scrollbar py-2 px-1"
         >
-          {mockBrands.map((brand, idx) => (
+          {brands.map((brand, idx) => (
             <div 
               key={idx}
               onClick={() => onSelectBrand(brand.name)}

@@ -49,8 +49,9 @@ app.get('/', (req, res) => {
   });
 });
 
-// Mount all API endpoints under /api/v1
+// Mount API endpoints under both /api/v1 and /api for compatibility
 app.use('/api/v1', apiRouter);
+app.use('/api', apiRouter);
 
 // 404 handler
 app.use((req, res) => {

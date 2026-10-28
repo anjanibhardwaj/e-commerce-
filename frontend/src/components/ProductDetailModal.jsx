@@ -12,7 +12,7 @@ export default function ProductDetailModal({
 
   if (!isOpen || !product) return null;
 
-  const inCart = cartItems.some(item => item.id === product.id);
+  const inCart = cartItems.some(item => (item.id || item._id) === (product.id || product._id));
 
   const handleAdd = () => {
     onAddToCart(product, quantity);

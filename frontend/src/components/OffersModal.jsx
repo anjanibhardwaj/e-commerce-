@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Percent, Tag, Copy, Check } from 'lucide-react';
-import { mockCoupons } from '../data/mockData';
+import { useData } from '../context/DataContext';
 
 export default function OffersModal({ isOpen, onClose, onApplyCoupon }) {
-  const [copiedCode, setCopiedCode] = React.useState(null);
+  const { coupons } = useData();
+  const [copiedCode, setCopiedCode] = useState(null);
 
   if (!isOpen) return null;
 
@@ -12,6 +13,13 @@ export default function OffersModal({ isOpen, onClose, onApplyCoupon }) {
     navigator.clipboard?.writeText(code);
     setTimeout(() => setCopiedCode(null), 2000);
   };
+
+  const displayCoupons = coupons && coupons.length > 0 ? coupons : [
+    { code: 'PHARMEASY50', description: 'Get 20% OFF on orders above ₹499', minOrder: 499, maxDiscount: 200 },
+    { code: 'FIRST25', description: 'Get 25% OFF on orders above ₹599', minOrder: 599, maxDiscount: 300 },
+    { code: 'PLUSEXTRA', description: 'Get 15% OFF on orders above ₹299', minOrder: 299, maxDiscount: 150 },
+    { code: 'HEALTH100', description: 'Flat ₹100 OFF on orders above ₹799', minOrder: 799, maxDiscount: 100 }
+  ];
 
   const bankOffers = [
     { title: "HDFC Bank Credit Cards", desc: "Flat ₹150 instant discount on orders above ₹1200", code: "HDFC150" },
@@ -38,15 +46,15 @@ export default function OffersModal({ isOpen, onClose, onApplyCoupon }) {
         </div>
 
         <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Active Promo Codes */}
+          {/* Active Promo Codes from MongoDB Atlas */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Available Store Coupons
             </h4>
 
-            {mockCoupons.map((coupon, idx) => (
+            {displayCoupons.map((coupon, idx) => (
               <div 
-                key={idx}
+                key={coupon.id || coupon._id || idx}
                 className="p-4 rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/50 flex items-start justify-between space-x-3"
               >
                 <div>

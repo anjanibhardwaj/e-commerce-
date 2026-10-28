@@ -1,14 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Clock, ChevronRight, ChevronLeft, Plus, Check } from 'lucide-react';
-import { mockProducts } from '../data/mockData';
+import { useData } from '../context/DataContext';
 
 export default function DealsOfTheDay({ onAddToCart, onOpenProductDetail, cartItems = [] }) {
+  const { products } = useData();
   const [timeLeft, setTimeLeft] = useState(2385); // approx 39 mins 45s
   const scrollRef = useRef(null);
 
+  // Derive deals directly from live MongoDB Atlas products (highest discount first)
+  const dealProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    const valid = products.filter((p) => !p.approvalStatus || p.approvalStatus === 'approved');
+    const sorted = [...valid].sort((a, b) => (b.discount || 0) - (a.discount || 0));
+    return sorted.slice(0, 10).map((p) => ({
+      ...p,
+      tag: p.discount ? `${p.discount}% OFF` : 'DEAL'
+    }));
+  }, [products]);
+
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft(prev => (prev > 0 ? prev - 1 : 3600));
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 3600));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -27,8 +39,12 @@ export default function DealsOfTheDay({ onAddToCart, onOpenProductDetail, cartIt
   };
 
   const isItemInCart = (productId) => {
-    return cartItems.some(item => item.id === productId);
+    return cartItems.some((item) => (item.id || item._id) === productId);
   };
+
+  if (dealProducts.length === 0) {
+    return null;
+  }
 
   return (
     <section id="deals-day" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -67,11 +83,12 @@ export default function DealsOfTheDay({ onAddToCart, onOpenProductDetail, cartIt
           ref={scrollRef}
           className="flex space-x-4 overflow-x-auto no-scrollbar py-2 px-1"
         >
-          {mockProducts.dealsOfDay.map((product) => {
-            const inCart = isItemInCart(product.id);
+          {dealProducts.map((product) => {
+            const prodId = product.id || product._id;
+            const inCart = isItemInCart(prodId);
             return (
               <div 
-                key={product.id}
+                key={prodId}
                 className="shrink-0 w-48 sm:w-56 bg-white rounded-2xl border border-amber-200/80 p-3.5 flex flex-col justify-between hover:shadow-xl transition-all duration-200 hover:border-amber-400 group/card relative"
               >
                 {/* Sale Tag */}

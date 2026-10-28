@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import UserLayout from '../layouts/UserLayout';
 import SellerLayout from '../layouts/SellerLayout';
 import AdminLayout from '../layouts/AdminLayout';
+import SuperAdminLayout from '../layouts/SuperAdminLayout';
 
 // Route Guards
 import ProtectedRoute from './ProtectedRoute';
@@ -44,6 +45,10 @@ import AdminPrescriptionsPage from '../pages/admin/AdminPrescriptionsPage';
 import AdminCategoriesPage from '../pages/admin/AdminCategoriesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import AdminSettingsPage from '../pages/admin/AdminSettingsPage';
+
+// SuperAdmin Panel Pages
+import SuperAdminLoginPage from '../pages/superadmin/SuperAdminLoginPage';
+import SuperAdminDashboardPage from '../pages/superadmin/SuperAdminDashboardPage';
 
 export default function AppRoutes() {
   return (
@@ -134,6 +139,23 @@ export default function AppRoutes() {
         <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
+      </Route>
+
+      {/* =========================================
+          4. SUPERADMIN PANEL (Executive Governance)
+          ========================================= */}
+      <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
+
+      <Route
+        path="/superadmin"
+        element={
+          <ProtectedRoute requiredRole="superadmin">
+            <SuperAdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/superadmin/dashboard" replace />} />
+        <Route path="dashboard" element={<SuperAdminDashboardPage />} />
       </Route>
 
       {/* Fallback to Home */}

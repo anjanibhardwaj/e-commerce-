@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { mockProducts, mockCategories } from '../data/mockData';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import demoUsers from '../data/demoUsers.json';
 import { generateOrderId } from '../utils/formatters';
 import apiClient from '../services/apiClient';
+import { useAuth } from './AuthContext';
 
 const DataContext = createContext(null);
 
@@ -13,13 +13,25 @@ const LS_PRESCRIPTIONS_KEY = 'med_ecommerce_prescriptions';
 const LS_CART_KEY = 'med_ecommerce_cart';
 const LS_WISHLIST_KEY = 'med_ecommerce_wishlist';
 const LS_AUDIT_KEY = 'med_ecommerce_audit';
+const LS_CATEGORIES_KEY = 'med_ecommerce_categories';
+const LS_COUPONS_KEY = 'med_ecommerce_coupons';
 
 export function DataProvider({ children }) {
+  const { user, openAuthModal } = useAuth();
   // Products from Database / Local fallback
   const [products, setProducts] = useState(() => {
     try {
       const stored = localStorage.getItem(LS_PRODUCTS_KEY);
-      return stored ? JSON.parse(stored) : [];
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Automatically purge any stale legacy mock items
+        if (Array.isArray(parsed) && parsed.some(p => typeof p.id === 'string' && (p.id.startsWith('nl-') || p.id.startsWith('deal-') || p.id.startsWith('vit-') || p.id.startsWith('device-')))) {
+          localStorage.removeItem(LS_PRODUCTS_KEY);
+          return [];
+        }
+        return parsed;
+      }
+      return [];
     } catch {
       return [];
     }
@@ -85,8 +97,36 @@ export function DataProvider({ children }) {
     }
   });
 
-  // Categories list
-  const [categories, setCategories] = useState(mockCategories);
+  // Categories list from MongoDB Atlas
+  const [categories, setCategories] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LS_CATEGORIES_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.some(c => typeof c.id === 'string' && c.id.startsWith('cat-'))) {
+          localStorage.removeItem(LS_CATEGORIES_KEY);
+          return [];
+        }
+        return parsed;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Coupons from MongoDB Atlas
+  const [coupons, setCoupons] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LS_COUPONS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Real-time synchronization timestamp
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(Date.now());
 
   // Global Toast
   const [toast, setToast] = useState(null);
@@ -119,12 +159,21 @@ export function DataProvider({ children }) {
     localStorage.setItem(LS_WISHLIST_KEY, JSON.stringify(wishlist));
   }, [wishlist]);
 
+  useEffect(() => {
+    if (categories.length > 0) localStorage.setItem(LS_CATEGORIES_KEY, JSON.stringify(categories));
+  }, [categories]);
+
+  useEffect(() => {
+    if (coupons.length > 0) localStorage.setItem(LS_COUPONS_KEY, JSON.stringify(coupons));
+  }, [coupons]);
+
   // Fetch live products from backend MongoDB
   const fetchLiveProducts = useCallback(async () => {
     try {
       const res = await apiClient.get('/products?limit=100');
       if (res && res.success && res.data?.items) {
         setProducts(res.data.items);
+        setLastRefreshedAt(Date.now());
       }
     } catch (err) {
       console.warn('[DataContext] Failed to fetch products from backend:', err.message);
@@ -143,6 +192,18 @@ export function DataProvider({ children }) {
     }
   }, []);
 
+  // Fetch live coupons from backend MongoDB
+  const fetchLiveCoupons = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/coupons');
+      if (res && res.success && res.data) {
+        setCoupons(res.data);
+      }
+    } catch (err) {
+      console.warn('[DataContext] Failed to fetch coupons from backend:', err.message);
+    }
+  }, []);
+
   // Fetch live orders depending on role
   const fetchLiveOrders = useCallback(async (role = 'user') => {
     try {
@@ -155,7 +216,7 @@ export function DataProvider({ children }) {
         setOrders(res.data);
       }
     } catch (err) {
-      console.warn('[DataContext] Failed to fetch orders from backend:', err.message);
+      // User might be unauthenticated, quiet warning
     }
   }, []);
 
@@ -167,15 +228,33 @@ export function DataProvider({ children }) {
         setSellers(res.data);
       }
     } catch (err) {
-      console.warn('[DataContext] Failed to fetch sellers from backend:', err.message);
+      // Quiet warning
     }
   }, []);
 
-  // Initial data load from live DB
+  // Live real-time polling every 3 seconds (as requested: "refresh alweys 3 sec dal do")
   useEffect(() => {
+    // Initial fetch on mount
     fetchLiveProducts();
     fetchLiveCategories();
-  }, [fetchLiveProducts, fetchLiveCategories]);
+    fetchLiveCoupons();
+    if (user) {
+      const userRole = (user.role === 'customer' || user.role === 'user') ? 'user' : user.role;
+      fetchLiveOrders(userRole);
+    }
+
+    const interval = setInterval(() => {
+      fetchLiveProducts();
+      fetchLiveCategories();
+      fetchLiveCoupons();
+      if (user) {
+        const userRole = (user.role === 'customer' || user.role === 'user') ? 'user' : user.role;
+        fetchLiveOrders(userRole);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [fetchLiveProducts, fetchLiveCategories, fetchLiveCoupons, fetchLiveOrders, user]);
 
   // Log compliance action
   const logAction = (action, details, actor = 'System') => {
@@ -190,7 +269,7 @@ export function DataProvider({ children }) {
   };
 
   // --- Cart Actions ---
-  const addToCart = (product, quantity = 1) => {
+  const executeAddToCart = (product, quantity = 1) => {
     setCart((prev) => {
       const existing = prev.find((item) => (item.id || item._id) === (product.id || product._id));
       if (existing) {
@@ -204,6 +283,19 @@ export function DataProvider({ children }) {
       }
     });
     showToast(`Added "${product.name.slice(0, 26)}..." to cart!`);
+  };
+
+  const addToCart = (product, quantity = 1) => {
+    // If user is not logged in, trigger Flipkart-style Login/Signup modal
+    if (!user) {
+      if (openAuthModal) {
+        openAuthModal(() => {
+          executeAddToCart(product, quantity);
+        });
+      }
+      return;
+    }
+    executeAddToCart(product, quantity);
   };
 
   const updateQuantity = (id, newQuantity) => {
@@ -329,6 +421,20 @@ export function DataProvider({ children }) {
     showToast('Product listing rejected.', 'error');
   };
 
+  const deleteProduct = async (productId) => {
+    try {
+      await apiClient.delete(`/admin/products/${productId}`);
+      showToast('Product removed from database catalog.', 'info');
+      fetchLiveProducts();
+      return;
+    } catch (err) {
+      console.warn('[DataContext] Live deleteProduct failed:', err.message);
+    }
+
+    setProducts((prev) => prev.filter((p) => (p.id || p._id) !== productId));
+    showToast('Product removed.', 'info');
+  };
+
   const updateStock = async (productId, newStock) => {
     try {
       await apiClient.put(`/seller/inventory/${productId}`, { stock: Number(newStock) });
@@ -403,6 +509,7 @@ export function DataProvider({ children }) {
 
       const res = await apiClient.post('/orders', {
         addressId: orderData.addressId,
+        shippingAddress: orderData.shippingAddress,
         paymentMethod: orderData.paymentMethod?.toLowerCase().includes('cash') ? 'COD' : 'ONLINE',
         items: itemsPayload,
         couponCode: orderData.couponCode
@@ -410,8 +517,9 @@ export function DataProvider({ children }) {
 
       if (res && res.success && res.data) {
         const liveOrder = {
-          id: res.data.orderId,
-          orderNumber: res.data.orderNumber,
+          id: res.data.orderNumber || res.data.orderId,
+          orderId: res.data.orderNumber || res.data.orderId,
+          orderNumber: res.data.orderNumber || res.data.orderId,
           totalAmount: res.data.grandTotal,
           status: res.data.status,
           createdAt: new Date().toISOString(),
@@ -430,10 +538,11 @@ export function DataProvider({ children }) {
       console.warn('[DataContext] Live order creation failed, falling back to local state:', err.message);
     }
 
-    // Local fallback with generated PE- order number
-    const orderId = `PE-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Local fallback with generated ORD- order number
+    const orderId = `ORD-2026-${Math.floor(100000 + Math.random() * 900000)}`;
     const newOrder = {
       id: orderId,
+      orderId: orderId,
       orderNumber: orderId,
       ...orderData,
       createdAt: new Date().toISOString(),
@@ -650,10 +759,14 @@ export function DataProvider({ children }) {
     wishlist,
     auditLogs,
     categories,
+    coupons,
+    lastRefreshedAt,
     toast,
     showToast,
     closeToast: () => setToast(null),
     fetchLiveProducts,
+    fetchLiveCategories,
+    fetchLiveCoupons,
     fetchLiveOrders,
     fetchLiveSellers,
     addToCart,
@@ -664,6 +777,7 @@ export function DataProvider({ children }) {
     addProduct,
     approveProduct,
     rejectProduct,
+    deleteProduct,
     updateStock,
     approveSeller,
     rejectSeller,

@@ -11,7 +11,7 @@ import {
   Truck,
   CheckCircle2
 } from 'lucide-react';
-import { mockCoupons } from '../data/mockData';
+import { useData } from '../context/DataContext';
 
 export default function CartDrawer({ 
   isOpen, 
@@ -22,6 +22,7 @@ export default function CartDrawer({
   onCheckout,
   selectedCity
 }) {
+  const { coupons } = useData();
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState('');
@@ -34,10 +35,15 @@ export default function CartDrawer({
 
   let couponDiscount = 0;
   if (appliedCoupon) {
-    couponDiscount = Math.min(
-      Math.round((totalSelling * appliedCoupon.discountPercent) / 100),
-      appliedCoupon.maxDiscount
-    );
+    if (appliedCoupon.type === 'FLAT') {
+      couponDiscount = Math.min(appliedCoupon.flatDiscount || appliedCoupon.maxDiscount || 100, totalSelling);
+    } else {
+      const pct = appliedCoupon.discountPercent || 20;
+      couponDiscount = Math.min(
+        Math.round((totalSelling * pct) / 100),
+        appliedCoupon.maxDiscount || 200
+      );
+    }
   }
 
   const deliveryFee = totalSelling > 499 || totalSelling === 0 ? 0 : 49;
@@ -46,16 +52,26 @@ export default function CartDrawer({
   const handleApplyCoupon = (e) => {
     e.preventDefault();
     setCouponError('');
-    const found = mockCoupons.find(c => c.code.toLowerCase() === couponCode.trim().toLowerCase());
+    const activeCoupons = coupons && coupons.length > 0 ? coupons : [
+      { code: 'PHARMEASY50', discountPercent: 20, minOrder: 499, maxDiscount: 200 },
+      { code: 'FIRST25', discountPercent: 25, minOrder: 599, maxDiscount: 300 },
+      { code: 'PLUSEXTRA', discountPercent: 15, minOrder: 299, maxDiscount: 150 },
+      { code: 'HEALTH100', discountPercent: 0, flatDiscount: 100, minOrder: 799, maxDiscount: 100 }
+    ];
+
+    const found = activeCoupons.find(
+      (c) => c.code.toLowerCase() === couponCode.trim().toLowerCase()
+    );
+
     if (found) {
-      if (totalSelling < found.minOrder) {
+      if (totalSelling < (found.minOrder || 0)) {
         setCouponError(`Minimum order value for ${found.code} is ₹${found.minOrder}`);
         return;
       }
       setAppliedCoupon(found);
       setCouponCode('');
     } else {
-      setCouponError('Invalid coupon code. Try PHARMEASY50 or FIRST25');
+      setCouponError('Invalid coupon code. Try PHARMEASY50, FIRST25, or HEALTH100');
     }
   };
 
@@ -119,52 +135,55 @@ export default function CartDrawer({
             <>
               {/* Product rows */}
               <div className="space-y-3">
-                {cartItems.map((item) => (
-                  <div 
-                    key={item.id}
-                    className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between space-x-3"
-                  >
-                    <div className="w-14 h-14 bg-white rounded-xl p-1 border border-gray-100 shrink-0 flex items-center justify-center">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-gray-800 truncate">
-                        {item.name}
-                      </h4>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        ₹{item.price} x {item.quantity} = <span className="font-bold text-gray-900">₹{item.price * item.quantity}</span>
-                      </div>
-                    </div>
-
-                    {/* Quantity Counter */}
-                    <div className="flex items-center space-x-2 bg-white px-2 py-1 rounded-lg border border-gray-200">
-                      <button 
-                        onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                        className="text-gray-500 hover:text-teal-700 p-0.5 cursor-pointer"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs font-bold text-gray-800 w-4 text-center">
-                        {item.quantity}
-                      </span>
-                      <button 
-                        onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                        className="text-gray-500 hover:text-teal-700 p-0.5 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <button 
-                      onClick={() => onRemoveItem(item.id)}
-                      className="text-gray-400 hover:text-rose-600 p-1 transition cursor-pointer"
-                      title="Remove Item"
+                {cartItems.map((item) => {
+                  const itemId = item.id || item._id;
+                  return (
+                    <div 
+                      key={itemId}
+                      className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between space-x-3"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="w-14 h-14 bg-white rounded-xl p-1 border border-gray-100 shrink-0 flex items-center justify-center">
+                        <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold text-gray-800 truncate">
+                          {item.name}
+                        </h4>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          ₹{item.price} x {item.quantity} = <span className="font-bold text-gray-900">₹{item.price * item.quantity}</span>
+                        </div>
+                      </div>
+
+                      {/* Quantity Counter */}
+                      <div className="flex items-center space-x-2 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                        <button 
+                          onClick={() => onUpdateQuantity(itemId, item.quantity - 1)}
+                          className="text-gray-500 hover:text-teal-700 p-0.5 cursor-pointer"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-xs font-bold text-gray-800 w-4 text-center">
+                          {item.quantity}
+                        </span>
+                        <button 
+                          onClick={() => onUpdateQuantity(itemId, item.quantity + 1)}
+                          className="text-gray-500 hover:text-teal-700 p-0.5 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <button 
+                        onClick={() => onRemoveItem(itemId)}
+                        className="text-gray-400 hover:text-rose-600 p-1 transition cursor-pointer"
+                        title="Remove Item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Coupon Code section */}

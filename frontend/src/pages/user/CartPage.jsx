@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Trash2, 
   Plus, 
@@ -14,11 +15,21 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
-import { mockCoupons } from '../../data/mockData';
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, showToast } = useData();
+  const { cart, updateQuantity, removeFromCart, showToast, coupons } = useData();
+  const { user, openAuthModal } = useAuth();
   const navigate = useNavigate();
+
+  const handleProceed = () => {
+    if (!user) {
+      openAuthModal(() => {
+        navigate('/checkout');
+      });
+      return;
+    }
+    navigate('/checkout');
+  };
 
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -44,18 +55,23 @@ export default function CartPage() {
   const handleApplyCoupon = (e) => {
     e.preventDefault();
     setCouponError('');
-    const match = mockCoupons.find(
-      (c) => c.code.toLowerCase() === couponCode.trim().toLowerCase()
+    const match = (coupons || []).find(
+      (c) => c.code?.toLowerCase() === couponCode.trim().toLowerCase()
     );
     if (match) {
-      if (totalSelling >= match.minOrder) {
-        setAppliedCoupon(match);
+      const minOrder = match.minOrder || match.minOrderValue || 0;
+      if (totalSelling >= minOrder) {
+        setAppliedCoupon({
+          code: match.code,
+          discountPercent: match.discountPercent || match.value || 0,
+          maxDiscount: match.maxDiscount || 500
+        });
         showToast(`Coupon ${match.code} applied! Saved extra!`, 'success');
       } else {
-        setCouponError(`Minimum order value for ${match.code} is ₹${match.minOrder}`);
+        setCouponError(`Minimum order value for ${match.code} is ₹${minOrder}`);
       }
     } else {
-      setCouponError('Invalid coupon code. Try HEALTH20 or FIRST50');
+      setCouponError('Invalid coupon code. Try PHARMEASY50 or FIRST25');
     }
   };
 
@@ -250,7 +266,7 @@ export default function CartPage() {
             </div>
 
             <button
-              onClick={() => navigate('/checkout')}
+              onClick={handleProceed}
               className="w-full py-3.5 px-4 bg-teal-700 hover:bg-teal-800 text-white font-black text-sm rounded-xl transition shadow-lg shadow-teal-700/20 flex items-center justify-center space-x-2 cursor-pointer"
             >
               <span>Proceed to Checkout</span>

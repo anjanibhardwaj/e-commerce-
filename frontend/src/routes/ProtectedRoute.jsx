@@ -1,7 +1,7 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 export default function ProtectedRoute({ children, requiredRole }) {
   const { user, role, loading } = useAuth();
@@ -23,15 +23,32 @@ export default function ProtectedRoute({ children, requiredRole }) {
     let loginPath = '/login';
     if (requiredRole === 'seller') loginPath = '/seller/login';
     if (requiredRole === 'admin') loginPath = '/admin/login';
+    if (requiredRole === 'superadmin') loginPath = '/superadmin/login';
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // Logged in with wrong role -> block cross-panel unauthorized access
-  if (requiredRole && role !== requiredRole) {
-    let targetDashboard = '/';
-    if (role === 'seller') targetDashboard = '/seller/dashboard';
-    if (role === 'admin') targetDashboard = '/admin/dashboard';
+  // Check role authorization
+  const userRole = (role || user.role || 'user').toLowerCase();
 
+  // Role permissions checking:
+  // - 'user' routes can be accessed by regular customers or any authenticated user
+  // - 'seller' routes can only be accessed by sellers
+  // - 'admin' routes can be accessed by admin or superadmin
+  // - 'superadmin' routes can only be accessed by superadmin
+  let isAuthorized = true;
+
+  if (requiredRole === 'superadmin') {
+    isAuthorized = userRole === 'superadmin';
+  } else if (requiredRole === 'admin') {
+    isAuthorized = userRole === 'admin' || userRole === 'superadmin';
+  } else if (requiredRole === 'seller') {
+    isAuthorized = userRole === 'seller';
+  } else if (requiredRole === 'user') {
+    // Regular customer area - any authenticated account can place orders
+    isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
         <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl border border-rose-200 text-center space-y-4">
@@ -40,10 +57,16 @@ export default function ProtectedRoute({ children, requiredRole }) {
           </div>
           <h2 className="text-xl font-extrabold text-gray-900">Access Restricted</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            You are logged in as a <span className="font-bold uppercase text-teal-700">{role}</span>. You do not have permissions to access the <span className="font-bold uppercase text-rose-600">{requiredRole}</span> panel.
+            You are logged in as <span className="font-bold uppercase text-teal-700">{userRole}</span>. You do not have permissions to access the <span className="font-bold uppercase text-rose-600">{requiredRole}</span> panel.
           </p>
           <div className="pt-2">
-            <Navigate to={targetDashboard} replace />
+            <Link
+              to="/"
+              className="inline-flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Return to Storefront</span>
+            </Link>
           </div>
         </div>
       </div>

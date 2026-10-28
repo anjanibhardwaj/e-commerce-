@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import CartDrawer from '../components/CartDrawer';
@@ -8,14 +8,14 @@ import PrescriptionModal from '../components/PrescriptionModal';
 import OffersModal from '../components/OffersModal';
 import AskEasyChatModal from '../components/AskEasyChatModal';
 import OrderTrackingModal from '../components/OrderTrackingModal';
+import LoginModal from '../components/LoginModal';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { mockCities } from '../data/mockData';
-import { LayoutDashboard, Store, ShieldCheck, ArrowRight, Truck } from 'lucide-react';
 
 export default function UserLayout() {
-  const { user, role, logout } = useAuth();
+  const { user, isAuthModalOpen, openAuthModal, closeAuthModal, handleAuthSuccess } = useAuth();
   const { cart, updateQuantity, removeFromCart, toast, closeToast, showToast, uploadPrescription } = useData();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,6 +31,12 @@ export default function UserLayout() {
 
   const handleProceedToCheckout = () => {
     setIsCartOpen(false);
+    if (!user) {
+      openAuthModal(() => {
+        navigate('/checkout');
+      });
+      return;
+    }
     navigate('/checkout');
   };
 
@@ -40,41 +46,6 @@ export default function UserLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans selection:bg-teal-100 selection:text-teal-900 flex flex-col">
-      {/* Quick Multi-Panel Switcher Pill Bar (Dev & Demo Showcase) */}
-      <div className="bg-slate-900 text-white text-xs px-4 py-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 z-50">
-        <div className="flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-bold text-slate-200">PharmEasy Demo Platform:</span>
-          <span className="text-slate-400 hidden sm:inline">Active Mode: <strong className="text-teal-400">User Storefront</strong></span>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setIsTrackingOpen(true)}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-teal-800 hover:bg-teal-700 text-teal-200 hover:text-white font-medium transition text-[11px] cursor-pointer"
-          >
-            <Truck className="w-3.5 h-3.5 text-teal-300" />
-            <span>Track Order</span>
-          </button>
-
-          <Link
-            to="/seller/login"
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-teal-700 text-slate-200 hover:text-white font-medium transition text-[11px]"
-          >
-            <Store className="w-3.5 h-3.5 text-teal-400" />
-            <span>Seller Hub</span>
-          </Link>
-
-          <Link
-            to="/admin/login"
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-teal-700 text-slate-200 hover:text-white font-medium transition text-[11px]"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>Admin Portal</span>
-          </Link>
-        </div>
-      </div>
-
       {/* Main Header */}
       <Header
         cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -85,9 +56,10 @@ export default function UserLayout() {
           if (user) {
             navigate('/account');
           } else {
-            navigate('/login');
+            openAuthModal();
           }
         }}
+        onOpenTrackOrder={() => setIsTrackingOpen(true)}
         user={user}
         onOpenPrescription={() => setIsPrescriptionOpen(true)}
         onOpenOffers={() => setIsOffersOpen(true)}
@@ -97,7 +69,7 @@ export default function UserLayout() {
 
       {/* Main View Area */}
       <main className="flex-1">
-        <Outlet context={{ setSelectedCity, selectedCity }} />
+        <Outlet context={{ setSelectedCity, selectedCity, openAuthModal, setIsTrackingOpen }} />
       </main>
 
       {/* Main Footer */}
@@ -167,6 +139,13 @@ export default function UserLayout() {
       <OrderTrackingModal
         isOpen={isTrackingOpen}
         onClose={() => setIsTrackingOpen(false)}
+      />
+
+      {/* Flipkart-Style Login / Signup Modal */}
+      <LoginModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        onLoginSuccess={handleAuthSuccess}
       />
 
       {/* Global Toast */}

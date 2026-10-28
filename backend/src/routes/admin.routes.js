@@ -5,6 +5,7 @@ import {
   reviewSeller,
   reviewProduct,
   getAllOrders,
+  updateAdminOrderStatus,
   getAuditLogs,
   getAdminProducts,
   getAdminPrescriptions,
@@ -26,6 +27,15 @@ router.get('/products', getAdminProducts);
 router.put('/products/:id/review', reviewProduct);
 router.delete('/products/:id', deleteProduct);
 router.get('/orders', getAllOrders);
+router.put('/orders/:id/status', updateAdminOrderStatus);
+router.post('/orders/:id/accept', (req, res, next) => {
+  req.body.status = 'PROCESSING_PHARMACY';
+  updateAdminOrderStatus(req, res, next);
+});
+router.post('/orders/:id/reject', (req, res, next) => {
+  req.body.status = 'REJECTED';
+  updateAdminOrderStatus(req, res, next);
+});
 router.get('/prescriptions', getAdminPrescriptions);
 router.put('/prescriptions/:id/review', reviewPrescription);
 router.get('/audit-logs', getAuditLogs);

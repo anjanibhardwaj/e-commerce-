@@ -74,7 +74,10 @@ export const getProducts = async (req, res, next) => {
       dosage: item.dosage,
       rating: item.rating,
       reviewsCount: item.reviewCount,
-      sellerName: item.sellerName || 'Apollo Care Pharmacy'
+      sellerName: item.sellerName || 'Apollo Care Pharmacy',
+      approvalStatus: item.approvalStatus || 'approved',
+      status: item.status || 'ACTIVE',
+      tags: item.tags || []
     }));
 
     return res.status(200).json({
@@ -131,7 +134,10 @@ export const getProductById = async (req, res, next) => {
         rating: product.rating,
         reviewsCount: product.reviewCount,
         sellerId: product.sellerId,
-        sellerName: product.sellerName || 'Apollo Care Pharmacy'
+        sellerName: product.sellerName || 'Apollo Care Pharmacy',
+        approvalStatus: product.approvalStatus || 'approved',
+        status: product.status || 'ACTIVE',
+        tags: product.tags || []
       }
     });
   } catch (error) {

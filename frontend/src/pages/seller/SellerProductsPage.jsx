@@ -25,10 +25,13 @@ export default function SellerProductsPage() {
   const [editingStockId, setEditingStockId] = useState(null);
   const [newStockVal, setNewStockVal] = useState('');
 
-  // Seller's products
-  const sellerProducts = products.filter(
-    (p) => p.sellerId === user?.id || !p.sellerId
-  );
+  // Seller's own products strictly matching their seller ID
+  const sellerProducts = products.filter((p) => {
+    if (!user) return false;
+    const uid = String(user.id || user._id || '');
+    const sid = String(p.sellerId || '');
+    return uid && sid && uid === sid;
+  });
 
   const filtered = sellerProducts.filter((p) => {
     if (searchTerm) {

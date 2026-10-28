@@ -93,6 +93,15 @@
       "phone": "+91 8888800000",
       "role": "admin",
       "department": "Platform Operations & Compliance"
+    },
+    {
+      "id": "superadmin-001",
+      "name": "Chief Platform SuperAdmin",
+      "email": "superadmin@example.com",
+      "password": "superadmin123",
+      "phone": "+91 9999900000",
+      "role": "superadmin",
+      "department": "Executive Platform Control"
     }
   ]
 }

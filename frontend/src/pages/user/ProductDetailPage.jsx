@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useData } from '../../context/DataContext';
+import apiClient from '../../services/apiClient';
 import { 
   ShieldCheck, 
   Truck, 
@@ -24,10 +25,35 @@ export default function ProductDetailPage() {
   const { products, cart, addToCart, showToast } = useData();
 
   const [quantity, setQuantity] = useState(1);
+  const [fetchedProduct, setFetchedProduct] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const product = products.find((p) => p.id === id);
+  const product = products.find((p) => (p.id || p._id) === id) || fetchedProduct;
+
+  useEffect(() => {
+    if (!products.some((p) => (p.id || p._id) === id)) {
+      setLoading(true);
+      apiClient.get(`/products/${id}`)
+        .then((res) => {
+          if (res?.success && res.data) {
+            setFetchedProduct(res.data);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [id, products]);
 
   if (!product) {
+    if (loading) {
+      return (
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
+          <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm font-bold text-gray-700">Loading live product details from database...</p>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
         <h2 className="text-xl font-bold text-gray-800">Product Not Found</h2>
@@ -39,9 +65,9 @@ export default function ProductDetailPage() {
     );
   }
 
-  const inCart = cart.find((item) => item.id === product.id);
+  const inCart = cart.find((item) => (item.id || item._id) === (product.id || product._id));
   const relatedProducts = products
-    .filter((p) => p.category === product.category && p.id !== product.id && p.approvalStatus === 'approved')
+    .filter((p) => p.category === product.category && (p.id || p._id) !== (product.id || product._id) && (!p.approvalStatus || p.approvalStatus === 'approved'))
     .slice(0, 4);
 
   const handleBuyNow = () => {

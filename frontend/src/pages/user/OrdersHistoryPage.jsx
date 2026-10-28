@@ -11,37 +11,54 @@ import {
   MapPin, 
   ChevronDown, 
   ChevronUp, 
-  ExternalLink,
   ShieldCheck,
-  Store
+  Store,
+  Copy,
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 export default function OrdersHistoryPage() {
   const { user } = useAuth();
-  const { orders } = useData();
+  const { orders, showToast } = useData();
 
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState('');
 
   // Filter user's orders
-  const userOrders = orders.filter(
-    (o) => o.userId === user?.id || o.userEmail === user?.email
-  );
+  const userOrders = orders.filter((o) => {
+    if (!user) return false;
+    const uid = String(user.id || user._id || '');
+    const oid = String(o.userId || '');
+    if (uid && oid && uid === oid) return true;
+    if (user.email && o.userEmail && user.email.toLowerCase() === o.userEmail.toLowerCase()) return true;
+    if (user.name && o.userName && user.name.toLowerCase() === o.userName.toLowerCase()) return true;
+    return false;
+  });
 
   const getStatusBadge = (status) => {
-    switch (status) {
+    const s = status?.toLowerCase() || '';
+    switch (s) {
       case 'placed':
-        return <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Placed</span>;
+      case 'payment_pending':
+        return <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Order Placed</span>;
+      case 'awaiting_prescription_review':
+        return <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Awaiting Rx Review</span>;
+      case 'processing_pharmacy':
+      case 'accepted':
       case 'verified':
-        return <span className="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Rx Verified</span>;
+        return <span className="bg-cyan-50 text-cyan-800 border border-cyan-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Pharmacy Accepted &amp; Dispensing</span>;
       case 'packed':
         return <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Packed by Pharmacy</span>;
       case 'dispatched':
-        return <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Dispatched</span>;
+        return <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Dispatched (In Transit)</span>;
       case 'delivered':
         return <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Delivered</span>;
+      case 'rejected':
+      case 'cancelled':
+        return <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Cancelled / Rejected</span>;
       default:
         return <span className="bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{status}</span>;
     }
@@ -49,23 +66,27 @@ export default function OrdersHistoryPage() {
 
   const steps = [
     { key: 'placed', label: 'Order Placed' },
-    { key: 'verified', label: 'Rx Verified' },
-    { key: 'packed', label: 'Packed' },
-    { key: 'dispatched', label: 'Dispatched' },
+    { key: 'accepted', label: 'Accepted by Pharmacy' },
+    { key: 'packed', label: 'Packed & Sealed' },
+    { key: 'dispatched', label: 'Out for Delivery' },
     { key: 'delivered', label: 'Delivered' }
   ];
 
   const getStepProgress = (status) => {
-    const idx = steps.findIndex((s) => s.key === status);
-    return idx === -1 ? 0 : idx;
+    const s = status?.toLowerCase() || '';
+    if (s === 'delivered') return 4;
+    if (s === 'dispatched') return 3;
+    if (s === 'packed') return 2;
+    if (s === 'processing_pharmacy' || s === 'accepted' || s === 'verified') return 1;
+    return 0;
   };
 
   if (userOrders.length === 0) {
     return (
       <div className="bg-white rounded-3xl border border-gray-200 p-12 text-center space-y-3">
         <Package className="w-12 h-12 text-gray-400 mx-auto" />
-        <h3 className="text-base font-bold text-gray-800">No Past Orders Found</h3>
-        <p className="text-xs text-gray-500">You haven't placed any medicine orders yet.</p>
+        <h3 className="text-base font-bold text-gray-800">No Orders Placed Yet</h3>
+        <p className="text-xs text-gray-500">Your placed medicine orders will appear here with live tracking.</p>
       </div>
     );
   }
@@ -73,133 +94,185 @@ export default function OrdersHistoryPage() {
   return (
     <div className="space-y-4">
       <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xs">
-        <h2 className="text-base font-extrabold text-gray-900">My Medicine Orders &amp; Real-Time Tracking</h2>
+        <h2 className="text-base font-extrabold text-gray-900">My Medicine Orders &amp; Live Tracking</h2>
         <p className="text-xs text-gray-500 mt-0.5">
-          Track fulfillment progress from the dispensing pharmacy to doorstep delivery
+          Flipkart-style order status updates from dispensing pharmacy to your doorstep ({userOrders.length} orders)
         </p>
       </div>
 
       <div className="space-y-4">
         {userOrders.map((order) => {
+          const orderRefId = order.orderNumber || order.orderId || order.id;
           const isExpanded = expandedOrderId === order.id;
           const currentStep = getStepProgress(order.status);
+          const isCancelled = order.status?.toLowerCase() === 'rejected' || order.status?.toLowerCase() === 'cancelled';
 
           return (
             <div
-              key={order.id}
+              key={order.id || order._id}
               className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-xs hover:border-teal-300 transition"
             >
               {/* Header Card */}
               <div className="p-5 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-slate-50/50">
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   <div className="flex items-center space-x-2">
-                    <span className="font-mono text-xs font-black text-gray-900">
-                      Order #{order.id}
+                    <span className="text-[11px] text-gray-400 font-bold uppercase">Order ID:</span>
+                    <span className="font-mono text-sm font-black text-teal-800">
+                      #{orderRefId}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(orderRefId);
+                        showToast('Order ID copied!');
+                      }}
+                      className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-700 cursor-pointer"
+                      title="Copy Order ID"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
                     {getStatusBadge(order.status)}
                   </div>
-                  <div className="text-[11px] text-gray-500">
-                    Placed on: {formatDateTime(order.createdAt)}
+                  <div className="text-[11px] text-gray-400">
+                    Placed on {formatDateTime(order.createdAt)} • Dispensed by{' '}
+                    <strong className="text-gray-700">{order.sellerName || 'Apollo Care Pharmacy'}</strong>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => {
-                      setSelectedTrackingId(order.orderNumber || order.id);
+                      setSelectedTrackingId(orderRefId);
                       setTrackingModalOpen(true);
                     }}
-                    className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                   >
-                    <Truck className="w-3.5 h-3.5 text-teal-600" />
-                    <span>Live Track</span>
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Track Order</span>
                   </button>
-
-                  <div className="text-right">
-                    <span className="text-[10px] text-gray-400 block font-semibold">Total Paid</span>
-                    <span className="text-sm font-black text-gray-900">{formatCurrency(order.totalAmount)}</span>
-                  </div>
 
                   <button
                     onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                    className="p-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 cursor-pointer"
+                    className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500 cursor-pointer"
                   >
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Real-time Visual Tracking Progress Bar */}
-              <div className="p-5 border-b border-gray-100">
-                <div className="text-xs font-bold text-gray-800 mb-3 flex items-center justify-between">
-                  <span className="flex items-center">
-                    <Truck className="w-4 h-4 mr-1.5 text-teal-700" />
-                    Delivery Timeline
-                  </span>
-                  {order.courierPartner && (
-                    <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded">
-                      Courier: {order.courierPartner} (AWB: {order.trackingNumber})
-                    </span>
-                  )}
-                </div>
-
-                <div className="relative flex items-center justify-between">
-                  <div className="absolute top-1/2 left-4 right-4 h-1 bg-gray-200 -translate-y-1/2 z-0">
-                    <div
-                      className="h-full bg-teal-600 transition-all duration-500"
-                      style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
-                    />
-                  </div>
-
-                  {steps.map((st, i) => {
-                    const isDone = i <= currentStep;
-                    const isCurrent = i === currentStep;
-                    return (
-                      <div key={st.key} className="relative z-10 flex flex-col items-center">
-                        <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
-                            isDone
-                              ? 'bg-teal-700 text-white shadow-xs'
-                              : 'bg-white border-2 border-gray-300 text-gray-400'
-                          } ${isCurrent ? 'ring-4 ring-teal-100' : ''}`}
-                        >
-                          {isDone ? '✓' : i + 1}
-                        </div>
-                        <span className={`text-[10px] mt-1.5 font-bold ${isCurrent ? 'text-teal-900' : 'text-gray-500'}`}>
-                          {st.label}
-                        </span>
+              {/* FLIPKART-STYLE STATUS TRACKER BAR */}
+              <div className="p-6 border-b border-gray-100">
+                {isCancelled ? (
+                  <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center space-x-3 text-xs text-rose-800">
+                    <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                    <div>
+                      <div className="font-bold">Order Cancelled / Rejected</div>
+                      <div className="text-[11px] text-rose-600 mt-0.5">
+                        {order.cancellationReason || 'Item unavailable at this pharmacy or prescription required.'}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="flex items-center justify-between relative z-10">
+                      {steps.map((st, idx) => {
+                        const isDone = idx <= currentStep;
+                        const isCurrent = idx === currentStep;
+
+                        return (
+                          <div key={st.key} className="flex flex-col items-center text-center flex-1">
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
+                                isDone
+                                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                                  : 'bg-gray-200 text-gray-500'
+                              } ${isCurrent ? 'ring-4 ring-emerald-100 scale-110' : ''}`}
+                            >
+                              {isDone ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
+                            </div>
+                            <span
+                              className={`text-[10px] mt-2 font-bold max-w-[80px] leading-tight ${
+                                isDone ? 'text-gray-900' : 'text-gray-400'
+                              }`}
+                            >
+                              {st.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Progress Track Line */}
+                    <div className="absolute top-4 left-8 right-8 h-1 bg-gray-200 -z-0">
+                      <div
+                        className="h-full bg-emerald-600 transition-all duration-500"
+                        style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Items Summary (always visible or expanded) */}
-              <div className="p-5 space-y-3">
-                <div className="text-xs font-bold text-gray-700">Order Items:</div>
-                <div className="divide-y divide-gray-100">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="py-2 flex items-center justify-between text-xs">
+              {/* Order Items & Summary Preview */}
+              <div className="p-5 bg-white space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-700">
+                    Items Ordered ({order.items?.length || 1}):
+                  </span>
+                  <span className="font-black text-gray-900 text-sm">
+                    {formatCurrency(order.totalAmount || order.pricing?.grandTotal / 100 || 0)}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {order.items?.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-gray-50 rounded-2xl flex items-center justify-between text-xs"
+                    >
                       <div>
-                        <span className="font-semibold text-gray-800">{item.name}</span>
-                        <span className="text-gray-400 ml-2">Qty: {item.quantity}</span>
+                        <div className="font-bold text-gray-900">{it.name}</div>
+                        <div className="text-[10px] text-gray-500">
+                          Qty: {it.quantity} • Unit Price: {formatCurrency(it.price || it.unitPrice / 100 || 0)}
+                        </div>
                       </div>
-                      <span className="font-bold text-gray-900">{formatCurrency(item.price * item.quantity)}</span>
+                      <div className="font-black text-gray-900">
+                        {formatCurrency((it.price || it.unitPrice / 100 || 0) * it.quantity)}
+                      </div>
                     </div>
                   ))}
                 </div>
 
+                {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="pt-3 border-t border-gray-100 text-xs text-gray-600 space-y-1.5 bg-gray-50 p-3 rounded-2xl">
-                    <div><strong>Dispensing Pharmacy:</strong> {order.sellerName || 'Apollo Care Pharmacy'}</div>
-                    <div><strong>Shipping To:</strong> {order.shippingAddress?.street}, {order.shippingAddress?.city}</div>
-                    <div><strong>Payment Method:</strong> {order.paymentMethod}</div>
-                    {order.prescriptionId && (
-                      <div className="text-teal-700 font-bold flex items-center mt-1">
-                        <FileText className="w-3.5 h-3.5 mr-1" />
-                        Doctor prescription attached (Ref: {order.prescriptionId})
+                  <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                        Delivery Address
+                      </span>
+                      <div className="text-gray-700">
+                        <div><strong>{order.shippingAddress?.fullName || order.userName}</strong></div>
+                        <div>{order.shippingAddress?.street}</div>
+                        <div>{order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pincode}</div>
+                        <div>Phone: {order.shippingAddress?.phone}</div>
                       </div>
-                    )}
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                        Payment &amp; Logistics
+                      </span>
+                      <div className="text-gray-700 space-y-0.5">
+                        <div>Payment Mode: <strong>{order.paymentMethod || 'Cash on Delivery'}</strong></div>
+                        <div>Payment Status: <strong>{order.paymentStatus || 'Pending'}</strong></div>
+                        {order.courierPartner && (
+                          <div>Courier Partner: <strong>{order.courierPartner}</strong></div>
+                        )}
+                        {order.trackingNumber && (
+                          <div>AWB Tracking: <strong className="font-mono text-teal-700">{order.trackingNumber}</strong></div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

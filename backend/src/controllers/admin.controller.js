@@ -148,6 +148,47 @@ export const getAllOrders = async (req, res, next) => {
   }
 };
 
+export const updateAdminOrderStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, cancellationReason, courierPartner, trackingNumber } = req.body;
+
+    const updateFields = { status };
+    if (cancellationReason) updateFields.cancellationReason = cancellationReason;
+    if (courierPartner) updateFields.courierPartner = courierPartner;
+    if (trackingNumber) updateFields.trackingNumber = trackingNumber;
+
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Order not found.' } });
+    }
+
+    await DeliveryTracking.findOneAndUpdate(
+      { orderId: id },
+      {
+        $set: { currentStatus: status },
+        $push: {
+          events: {
+            status,
+            note: `Order status set to ${status} by Platform Administrator`,
+            actor: req.user?.email || 'Platform Admin'
+          }
+        }
+      },
+      { upsert: true }
+    );
+
+    return res.status(200).json({ success: true, message: 'Order status updated.', data: order });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAuditLogs = async (req, res, next) => {
   try {
     const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(100);
@@ -191,6 +232,7 @@ export const getAdminProducts = async (req, res, next) => {
   }
 };
 
+
 export const getAdminPrescriptions = async (req, res, next) => {
   try {
     const prescriptions = await Prescription.find().sort({ createdAt: -1 });
@@ -221,6 +263,7 @@ export const getAdminPrescriptions = async (req, res, next) => {
     next(error);
   }
 };
+
 
 export const deleteProduct = async (req, res, next) => {
   try {

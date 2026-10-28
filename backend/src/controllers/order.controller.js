@@ -6,7 +6,7 @@ import { InventoryService } from '../services/inventory.service.js';
 
 export const createOrder = async (req, res, next) => {
   try {
-    const { addressId, couponCode, prescriptionIds, paymentMethod = 'COD', items } = req.body;
+    const { addressId, shippingAddress, couponCode, prescriptionIds, paymentMethod = 'COD', items } = req.body;
     const idempotencyKey = req.headers['idempotency-key'] || `idemp_${Date.now()}_${Math.random()}`;
 
     // If client didn't supply items array, pull from customer's active Cart
@@ -26,8 +26,10 @@ export const createOrder = async (req, res, next) => {
       userId: req.user.id,
       userName: req.user.name,
       userEmail: req.user.email,
+      userPhone: req.user.phone,
       items: lineItems,
       addressId,
+      shippingAddress,
       couponCode,
       prescriptionIds,
       paymentMethod,
